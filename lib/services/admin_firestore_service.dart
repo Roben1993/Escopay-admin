@@ -119,16 +119,34 @@ class AdminFirestoreService {
     });
   }
 
-  Future<double> getTotalRevenue() async {
+  /// Platform fee revenue split by fiat currency and crypto token.
+  /// Fiat fees come from escrows where paymentType == 'fiat' (MoMo/bank).
+  /// Crypto fees come from on-chain escrows.
+  Future<Map<String, dynamic>> getRevenueBreakdown() async {
     final snap = await _db
         .collection(AdminConstants.escrowsCollection)
         .where('status', isEqualTo: 'completed')
         .get();
-    double total = 0;
+
+    final fiatFees = <String, double>{};   // e.g. {'RWF': 12500, 'UGX': 4200}
+    final cryptoFees = <String, double>{}; // e.g. {'USDT': 82.0, 'USDC': 24.0}
+
     for (final doc in snap.docs) {
-      total += (doc.data()['platformFee'] as num?)?.toDouble() ?? 0;
+      final data = doc.data();
+      final fee = (data['platformFee'] as num?)?.toDouble() ?? 0.0;
+      if (fee == 0) continue;
+
+      final paymentType = data['paymentType'] as String? ?? 'crypto';
+      if (paymentType == 'fiat') {
+        final code = (data['fiatCurrency'] as String?)?.toUpperCase() ?? 'RWF';
+        fiatFees[code] = (fiatFees[code] ?? 0) + fee;
+      } else {
+        final token = (data['tokenSymbol'] as String?)?.toUpperCase() ?? 'USDT';
+        cryptoFees[token] = (cryptoFees[token] ?? 0) + fee;
+      }
     }
-    return total;
+
+    return {'fiat': fiatFees, 'crypto': cryptoFees};
   }
 
   // ─── P2P ORDERS ───────────────────────────────────────────────────────────

@@ -7,6 +7,7 @@ import 'package:timeago/timeago.dart' as timeago;
 import '../../core/constants/admin_routes.dart';
 import '../../core/constants/admin_theme.dart';
 import '../../core/widgets/stat_card.dart';
+import '../../providers/analytics_provider.dart' show kPawaPayCountries;
 import '../../providers/dashboard_provider.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -32,6 +33,10 @@ class DashboardScreen extends StatelessWidget {
                 else ...[
                   _StatsGrid(provider: provider),
                   const SizedBox(height: 32),
+                  if (provider.hasRevenue) ...[
+                    _RevenueSection(provider: provider),
+                    const SizedBox(height: 32),
+                  ],
                   _RecentActivity(activity: provider.recentActivity),
                 ],
               ],
@@ -50,10 +55,10 @@ class _StatsGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GridView.count(
-      crossAxisCount: 4,
+      crossAxisCount: 3,
       crossAxisSpacing: 16,
       mainAxisSpacing: 16,
-      childAspectRatio: 1.8,
+      childAspectRatio: 2.2,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       children: [
@@ -81,17 +86,160 @@ class _StatsGrid extends StatelessWidget {
           color: Colors.green,
           onTap: () => context.go(AdminRoutes.merchants),
         ),
-        StatCard(
-          title: 'Total Revenue',
-          value: '\$${provider.totalRevenue.toStringAsFixed(2)}',
-          icon: Icons.attach_money_rounded,
-          color: Colors.indigo,
-          onTap: () => context.go(AdminRoutes.escrows),
-        ),
       ],
     );
   }
 }
+
+// ─── Revenue Section ──────────────────────────────────────────────────────────
+
+class _RevenueSection extends StatelessWidget {
+  final DashboardProvider provider;
+  const _RevenueSection({required this.provider});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Platform Revenue by Market',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 16),
+
+            // ── Fiat (MoMo / Bank) ──────────────────────────────────────────
+            if (provider.fiatRevenue.isNotEmpty) ...[
+              _RevenueGroupLabel(
+                icon: Icons.phone_android_rounded,
+                label: 'Mobile Money / Bank',
+                color: Colors.teal,
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: provider.fiatRevenue.entries.map((e) {
+                  final code = e.key;
+                  final info = kPawaPayCountries[code];
+                  final flag = info?.flag ?? '🌍';
+                  final country = info?.name ?? code;
+                  return _RevenueTile(
+                    flag: flag,
+                    label: '$code · $country',
+                    amount: _formatFiat(e.value),
+                    color: Colors.teal,
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 20),
+            ],
+
+            // ── Crypto (On-chain) ────────────────────────────────────────────
+            if (provider.cryptoRevenue.isNotEmpty) ...[
+              _RevenueGroupLabel(
+                icon: Icons.link_rounded,
+                label: 'On-chain Crypto',
+                color: Colors.indigo,
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: provider.cryptoRevenue.entries.map((e) {
+                  return _RevenueTile(
+                    flag: '🔗',
+                    label: e.key,
+                    amount: '${e.value.toStringAsFixed(4)} ${e.key}',
+                    color: Colors.indigo,
+                  );
+                }).toList(),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatFiat(double v) {
+    if (v >= 1000000) return '${(v / 1000000).toStringAsFixed(2)}M';
+    if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)}K';
+    return v.toStringAsFixed(0);
+  }
+}
+
+class _RevenueGroupLabel extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  const _RevenueGroupLabel({required this.icon, required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 6),
+        Text(label,
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: color)),
+      ],
+    );
+  }
+}
+
+class _RevenueTile extends StatelessWidget {
+  final String flag;
+  final String label;
+  final String amount;
+  final Color color;
+  const _RevenueTile({required this.flag, required this.label, required this.amount, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withAlpha(18),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withAlpha(50)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(flag, style: const TextStyle(fontSize: 16)),
+              const SizedBox(width: 6),
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[700],
+                      fontWeight: FontWeight.w500)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(amount,
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: color)),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Recent Activity ──────────────────────────────────────────────────────────
 
 class _RecentActivity extends StatelessWidget {
   final List<Map<String, dynamic>> activity;

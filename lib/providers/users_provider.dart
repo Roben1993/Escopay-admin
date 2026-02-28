@@ -35,16 +35,25 @@ class UsersProvider extends ChangeNotifier {
     await _service.updateKycStatus(uid, status);
     final idx = _users.indexWhere((u) => u.uid == uid);
     if (idx != -1) {
+      final u = _users[idx];
       _users[idx] = AdminUserModel(
-        uid: _users[idx].uid,
-        email: _users[idx].email,
-        displayName: _users[idx].displayName,
-        walletAddress: _users[idx].walletAddress,
+        uid: u.uid,
+        email: u.email,
+        displayName: u.displayName,
+        walletAddress: u.walletAddress,
         kycStatus: status,
-        merchantStatus: _users[idx].merchantStatus,
-        createdAt: _users[idx].createdAt,
-        lastLoginAt: _users[idx].lastLoginAt,
-        firestoreDocId: _users[idx].firestoreDocId,
+        merchantStatus: u.merchantStatus,
+        createdAt: u.createdAt,
+        lastLoginAt: u.lastLoginAt,
+        firestoreDocId: u.firestoreDocId,
+        kycFullName: u.kycFullName,
+        kycDocType: u.kycDocType,
+        kycDocNumber: u.kycDocNumber,
+        kycPhone: u.kycPhone,
+        kycFrontUrl: u.kycFrontUrl,
+        kycBackUrl: u.kycBackUrl,
+        kycSelfieUrl: u.kycSelfieUrl,
+        kycSubmittedAt: u.kycSubmittedAt,
       );
       notifyListeners();
     }

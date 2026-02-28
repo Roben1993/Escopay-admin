@@ -114,7 +114,7 @@ class _FilterChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return FilterChip(
       label: Text(label),
-      selected: false,
+      selected: provider.statusFilter == value,
       onSelected: (_) => provider.loadDisputes(statusFilter: value),
     );
   }

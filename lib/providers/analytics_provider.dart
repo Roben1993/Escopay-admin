@@ -25,9 +25,8 @@ class AnalyticsProvider extends ChangeNotifier {
     try {
       final db = FirebaseFirestore.instance;
 
-      // P2P orders country breakdown
-      final ordersSnap = await db.collection(AdminConstants.p2pOrdersCollection)
-          .limit(500).get();
+      // P2P orders country breakdown — no artificial limit
+      final ordersSnap = await db.collection(AdminConstants.p2pOrdersCollection).get();
 
       final countryMap = <String, int>{};
       final statusMap = <String, int>{};
@@ -48,9 +47,9 @@ class AnalyticsProvider extends ChangeNotifier {
       _statusBreakdown = statusMap;
       _totalP2PVolume = p2pVolume;
 
-      // Escrow volume
+      // Escrow volume — no artificial limit
       final escrowsSnap = await db.collection(AdminConstants.escrowsCollection)
-          .where('status', isEqualTo: 'completed').limit(500).get();
+          .where('status', isEqualTo: 'completed').get();
       int escrowVolume = 0;
       for (final doc in escrowsSnap.docs) {
         escrowVolume += ((doc.data()['amount'] as num?)?.toInt() ?? 0);

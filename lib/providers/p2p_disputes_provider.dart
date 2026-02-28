@@ -8,14 +8,17 @@ class P2PDisputesProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   List<P2PDisputeModel> _disputes = [];
+  String? _statusFilter;
 
   bool get isLoading => _isLoading;
   String? get error => _error;
   List<P2PDisputeModel> get disputes => _disputes;
+  String? get statusFilter => _statusFilter;
 
-  Future<void> loadDisputes({String? statusFilter}) async {
+  Future<void> loadDisputes({String? statusFilter, bool updateFilter = true}) async {
     _isLoading = true;
     _error = null;
+    if (updateFilter) _statusFilter = statusFilter;
     notifyListeners();
     try {
       _disputes = await _service.getAllDisputes(statusFilter: statusFilter);

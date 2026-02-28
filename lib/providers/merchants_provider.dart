@@ -8,7 +8,7 @@ class MerchantsProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   List<MerchantModel> _merchants = [];
-  String _statusFilter = 'pending';
+  String _statusFilter = 'all';
 
   bool get isLoading => _isLoading;
   String? get error => _error;

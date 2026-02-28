@@ -22,16 +22,65 @@ class AnalyticsScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Analytics', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Text('Analytics',
+                    style: Theme.of(context)
+                        .textTheme
+                        .headlineMedium
+                        ?.copyWith(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 28),
-                Row(
-                  children: [
-                    _VolumeCard(title: 'Escrow Volume (USDT)', value: provider.totalEscrowVolume, color: AdminTheme.primaryColor),
-                    const SizedBox(width: 16),
-                    _VolumeCard(title: 'P2P Volume (USDT)', value: provider.totalP2PVolume, color: Colors.teal),
-                  ],
+
+                // ── P2P Fiat Volume ─────────────────────────────────────────
+                _SectionHeader(
+                  icon: Icons.currency_exchange,
+                  title: 'P2P Fiat Volume (completed orders)',
+                  color: Colors.teal,
                 ),
+                const SizedBox(height: 12),
+                provider.p2pFiatVolumeByToken.isEmpty
+                    ? const _EmptyCard(message: 'No completed P2P fiat trades yet')
+                    : _TokenVolumeRow(
+                        volumeByToken: provider.p2pFiatVolumeByToken,
+                        isFiat: true,
+                        baseColor: Colors.teal,
+                      ),
+
+                const SizedBox(height: 28),
+
+                // ── P2P Crypto Volume ───────────────────────────────────────
+                _SectionHeader(
+                  icon: Icons.swap_horiz_rounded,
+                  title: 'P2P Crypto Traded (completed orders)',
+                  color: Colors.indigo,
+                ),
+                const SizedBox(height: 12),
+                provider.p2pCryptoVolumeByToken.isEmpty
+                    ? const _EmptyCard(message: 'No completed P2P crypto trades yet')
+                    : _TokenVolumeRow(
+                        volumeByToken: provider.p2pCryptoVolumeByToken,
+                        isFiat: false,
+                        baseColor: Colors.indigo,
+                      ),
+
+                const SizedBox(height: 28),
+
+                // ── Escrow Crypto Volume ────────────────────────────────────
+                _SectionHeader(
+                  icon: Icons.shield_rounded,
+                  title: 'Escrow Volume (completed escrows)',
+                  color: AdminTheme.primaryColor,
+                ),
+                const SizedBox(height: 12),
+                provider.escrowVolumeByToken.isEmpty
+                    ? const _EmptyCard(message: 'No completed escrows yet')
+                    : _TokenVolumeRow(
+                        volumeByToken: provider.escrowVolumeByToken,
+                        isFiat: false,
+                        baseColor: AdminTheme.primaryColor,
+                      ),
+
                 const SizedBox(height: 32),
+
+                // ── Charts ──────────────────────────────────────────────────
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -49,31 +98,161 @@ class AnalyticsScreen extends StatelessWidget {
   }
 }
 
-class _VolumeCard extends StatelessWidget {
+// ── Section header ───────────────────────────────────────────────────────────
+
+class _SectionHeader extends StatelessWidget {
+  final IconData icon;
   final String title;
-  final int value;
   final Color color;
-  const _VolumeCard({required this.title, required this.value, required this.color});
+  const _SectionHeader({required this.icon, required this.title, required this.color});
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: TextStyle(color: Colors.grey[600])),
-              const SizedBox(height: 8),
-              Text('\$$value USDT', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color)),
-            ],
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: color),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: Theme.of(context)
+              .textTheme
+              .titleMedium
+              ?.copyWith(fontWeight: FontWeight.w700, color: color),
+        ),
+      ],
+    );
+  }
+}
+
+// ── A horizontal row of volume cards, one per token/currency ─────────────────
+
+class _TokenVolumeRow extends StatelessWidget {
+  final Map<String, double> volumeByToken;
+  final bool isFiat;
+  final Color baseColor;
+  const _TokenVolumeRow({
+    required this.volumeByToken,
+    required this.isFiat,
+    required this.baseColor,
+  });
+
+  static const _shade = [
+    0xFF006064, 0xFF00838F, 0xFF00ACC1, 0xFF26C6DA, // teal shades
+    0xFF283593, 0xFF3949AB, 0xFF5C6BC0, 0xFF9FA8DA, // indigo shades
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = volumeByToken.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    return Wrap(
+      spacing: 16,
+      runSpacing: 12,
+      children: entries.asMap().entries.map((e) {
+        final idx = e.key;
+        final token = e.value.key;
+        final amount = e.value.value;
+        final color = Color(_shade[idx % _shade.length]);
+
+        final formatted = isFiat
+            ? _formatFiat(amount, token)
+            : _formatCrypto(amount, token);
+
+        return SizedBox(
+          width: 210,
+          child: Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          token,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: color,
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      Icon(
+                        isFiat ? Icons.currency_exchange : Icons.token,
+                        size: 16,
+                        color: color.withOpacity(0.5),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    formatted,
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    isFiat ? 'Fiat traded' : 'Crypto volume',
+                    style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                  ),
+                ],
+              ),
+            ),
           ),
+        );
+      }).toList(),
+    );
+  }
+
+  String _formatFiat(double amount, String currency) {
+    if (amount >= 1_000_000) return '${currency} ${(amount / 1_000_000).toStringAsFixed(2)}M';
+    if (amount >= 1_000) return '${currency} ${(amount / 1_000).toStringAsFixed(1)}K';
+    return '${currency} ${amount.toStringAsFixed(0)}';
+  }
+
+  String _formatCrypto(double amount, String token) {
+    if (amount >= 1_000_000) return '${(amount / 1_000_000).toStringAsFixed(2)}M $token';
+    if (amount >= 1_000) return '${(amount / 1_000).toStringAsFixed(2)}K $token';
+    return '${amount.toStringAsFixed(2)} $token';
+  }
+}
+
+// ── Empty state card ─────────────────────────────────────────────────────────
+
+class _EmptyCard extends StatelessWidget {
+  final String message;
+  const _EmptyCard({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            Icon(Icons.hourglass_empty, color: Colors.grey[400]),
+            const SizedBox(width: 12),
+            Text(message, style: TextStyle(color: Colors.grey[600])),
+          ],
         ),
       ),
     );
   }
 }
+
+// ── Country pie chart ─────────────────────────────────────────────────────────
 
 class _CountryBreakdown extends StatelessWidget {
   final Map<String, int> data;
@@ -81,9 +260,15 @@ class _CountryBreakdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (data.isEmpty) return const Card(child: Padding(padding: EdgeInsets.all(24), child: Text('No P2P order data yet')));
+    if (data.isEmpty) {
+      return const Card(
+          child: Padding(padding: EdgeInsets.all(24), child: Text('No P2P order data yet')));
+    }
 
-    final colors = [Colors.blue, Colors.green, Colors.orange, Colors.purple, Colors.teal, Colors.red, Colors.indigo];
+    final colors = [
+      Colors.blue, Colors.green, Colors.orange, Colors.purple,
+      Colors.teal, Colors.red, Colors.indigo,
+    ];
     final entries = data.entries.take(7).toList();
     final total = entries.fold(0, (sum, e) => sum + e.value);
 
@@ -93,7 +278,11 @@ class _CountryBreakdown extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('P2P Orders by Country', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
+            Text('P2P Orders by Country',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 24),
             SizedBox(
               height: 220,
@@ -106,7 +295,8 @@ class _CountryBreakdown extends StatelessWidget {
                     return PieChartSectionData(
                       value: e.value.toDouble(),
                       title: '${e.key}\n$pct%',
-                      titleStyle: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                      titleStyle: const TextStyle(
+                          fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
                       color: colors[i % colors.length],
                       radius: 80,
                     );
@@ -125,7 +315,8 @@ class _CountryBreakdown extends StatelessWidget {
                   children: [
                     Container(width: 12, height: 12, color: colors[entry.key % colors.length]),
                     const SizedBox(width: 4),
-                    Text('${entry.value.key} (${entry.value.value})', style: const TextStyle(fontSize: 12)),
+                    Text('${entry.value.key} (${entry.value.value})',
+                        style: const TextStyle(fontSize: 12)),
                   ],
                 );
               }).toList(),
@@ -137,13 +328,18 @@ class _CountryBreakdown extends StatelessWidget {
   }
 }
 
+// ── Status bar chart ──────────────────────────────────────────────────────────
+
 class _StatusBreakdown extends StatelessWidget {
   final Map<String, int> data;
   const _StatusBreakdown({required this.data});
 
   @override
   Widget build(BuildContext context) {
-    if (data.isEmpty) return const Card(child: Padding(padding: EdgeInsets.all(24), child: Text('No order data yet')));
+    if (data.isEmpty) {
+      return const Card(
+          child: Padding(padding: EdgeInsets.all(24), child: Text('No order data yet')));
+    }
 
     final entries = data.entries.toList();
     final maxVal = entries.fold(0, (m, e) => e.value > m ? e.value : m).toDouble();
@@ -154,7 +350,11 @@ class _StatusBreakdown extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('P2P Order Status Breakdown', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
+            Text('P2P Order Status Breakdown',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 24),
             SizedBox(
               height: 220,
